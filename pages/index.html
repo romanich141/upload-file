@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload file</title>
+</head>
+<body>
+    File: <input type="file" id="input" />
+    <img id="image" src="" alt="Upload image" style="max-width: 400px; max-height: 300px;">
+    <button id="upload">Start loading</button>
+    <div id="output"></div>
+
+    <script>
+        const buttonUpload = document.getElementById('upload');
+        const input = document.getElementById('input');
+        const divOutput = document.getElementById('output');
+        const image = document.getElementById('image');
+
+        const printLoadingPercent = (percent) => {
+            divOutput.textContent = `${percent} %`;
+        }
+
+        input.addEventListener("change", (event) => {
+            if (event.target.files.length > 0) {
+                const file = event.target.files[0];
+                const url = URL.createObjectURL(file);
+                image.src = url;
+            }
+        });
+
+        buttonUpload.addEventListener('click', (event) => {
+            const fileReader = new FileReader();
+            const file = input.files[0];
+            const controller = new AbortController();
+            const signal = controller.signal;
+
+            fileReader.onload = async (fileReaderEvent) => {
+                try {
+                    const fileSize = fileReaderEvent.target.result.byteLength;
+                    const CHUNK_SIZE = 500;
+                    const chunkCount = fileSize / CHUNK_SIZE;
+                    const fileName = 'Filename';
+                    console.log(fileReaderEvent)
+                    for (let i = 0; i < chunkCount; i++) {
+                        const chunk = fileReaderEvent.target.result.slice(i * CHUNK_SIZE, i * CHUNK_SIZE + CHUNK_SIZE);
+                        
+                        await fetch('http://localhost:3000/upload', {
+                            method: 'POST', 
+                            signal: controller.signal,
+                            headers: {
+                                'content-type': 'application/octet-stream',
+                                'content-length': chunk.byteLength,
+                                'file-name': file.name,
+                            },
+                            body: chunk,
+                        });
+
+                        const loadingPercent = Math.round((i * 100) / chunkCount);
+                        printLoadingPercent(loadingPercent);
+                    }
+                } catch (error) {
+                    controller.abort();
+                }
+                
+            };
+
+            fileReader.readAsArrayBuffer(file);
+        })
+    </script>
+</body>
+</html>
